@@ -3,13 +3,14 @@ from picamera import PiCamera
 from threading import Thread
 from threading import Event
 import RPi.GPIO as GPIO
-import collections
+import re
 import numpy as np
 import time
 import cv2
 
 UNIT = 0.5
 PIN = 13
+FILE_PATH = 'input.txt'
 
 """
 Morse code encoder using a LED on PIN on Raspberry Pi
@@ -81,6 +82,7 @@ class VideoDecoder(MorseCode):
         GPIO.setmode(GPIO.BCM)
         print('Calibrating')
         GPIO.setup(self.pin, GPIO.OUT)
+        GPIO.output(self.pin, False)
         camera = PiCamera()
         camera.resolution = (640, 480)
         camera.framerate = 32
@@ -131,10 +133,11 @@ class VideoDecoder(MorseCode):
             bg_im[self.y1:self.y2, self.x1:self.x2] = bin_im
             if bin_im[bin_im > 0].size > 10 :
                 on_count = on_count + 1
-                if(off_count < 25 and off_count > 10):
+                if(off_count < 30 and off_count > 10):
                     word += self.rev_code_table[letter]
                     letter = ''
-                if(off_count < 45 and off_count > 30):
+                if(off_count < 50 and off_count >= 30):
+                    word += self.rev_code_table[letter]
                     print(word)
                     word = ''
 ##                print('off_count : ' + str(off_count))
@@ -165,8 +168,13 @@ class VideoDecoder(MorseCode):
 
 def morse_encode():
     m = MorseCode(UNIT, PIN)
+    f = open(FILE_PATH)
+    input_text = f.read()
+    text = re.sub('[\r\n]+',' ',input_text)
+    text = re.sub('[^a-zA-Z0-9 ]+','',text)
     time.sleep(10)
-    m.output_word('TEST')
+    for word in text.split():
+        m.output_word(word)
     GPIO.cleanup()
     return
     
@@ -181,4 +189,3 @@ def morse_decode():
 if __name__ == '__main__':
     Thread(target=morse_encode).start()
     Thread(target=morse_decode).start()
-    
