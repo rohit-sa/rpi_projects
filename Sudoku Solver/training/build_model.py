@@ -33,12 +33,20 @@ def model(X):
 def model1(X):
 	
 	with tf.name_scope('layer1'):
-		
+		fc1 = tf.layers.dense(inputs= X,
+		units= 200,
+		activation= tf.nn.relu,
+		kernel_initializer= tf.truncated_normal_initializer(stddev= 0.5),
+		bias_initializer= tf.zeros_initializer())
 		
 	with tf.name_scope('layer2'):
+		fc2 = tf.layers.dense(inputs= fc1,
+		units= 10,
+		activation= None,
+		kernel_initializer= tf.truncated_normal_initializer(stddev= 0.5),
+		bias_initializer= tf.zeros_initializer())
 		
-		out = tf.add(tf.matmul(h1, W2),b2)
-		
+	out = fc2
 	return out		
 
 def main():
@@ -55,7 +63,7 @@ def main():
 		X = tf.placeholder(tf.float32, [None, 784])
 		label = tf.placeholder(tf.float32, [None, 10])
 		
-	Y_logit = model(X)	
+	Y_logit = model1(X)	
 	Y = tf.nn.softmax(Y_logit)
 	
 	with tf.name_scope('loss'):
