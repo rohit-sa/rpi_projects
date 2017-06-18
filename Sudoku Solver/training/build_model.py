@@ -6,81 +6,62 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
 import tensorflow as tf
 import numpy as np
+import cv2
 
 tf.logging.set_verbosity(tf.logging.INFO)
 
-def conv2d(x, W):
-	return tf.nn.conv2d(x, W, strides= [1, 1, 1, 1], padding= 'SAME')
-
-def max_pool_2x2(x):
-	return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],
-	strides=[1, 2, 2, 1], padding='SAME')
 
 def model(X):
-	
-	X= tf.reshape(X,[-1, 28, 28, 1])
-	with tf.name_scope('layer1'):
-		conv1 = tf.layers.conv2d(inputs= X,
+	X = tf.divide(X, 255)
+	X = tf.reshape(X,[-1, 28, 28, 1])
+	conv1 = tf.layers.conv2d(inputs= X,
 		filters= 32,
 		kernel_size= [5, 5],
 		strides= [1, 1],
 		padding= 'same',
 		activation= tf.nn.relu,
 		kernel_initializer= tf.truncated_normal_initializer(stddev= 0.1),
-		bias_initializer= tf.zeros_initializer())
-	#~ W1 = tf.Variable(tf.truncated_normal([5, 5, 1, 32], stddev= 0.1))
-	#~ b1 = tf.Variable(tf.constant(0.1, shape= [32]))
-	#~ conv1 = tf.nn.relu(conv2d(X, W1) + b1)
+		bias_initializer= tf.zeros_initializer(),
+		name= 'conv_layer1')
 
-	with tf.name_scope('max_pooling1'):
-		pool1 = tf.layers.max_pooling2d(inputs= conv1,
+	pool1 = tf.layers.max_pooling2d(inputs= conv1,
 		pool_size= [2, 2],
 		padding= 'same',
-		strides= 2)
-		
-	#~ pool1 = max_pool_2x2(conv1)	
+		strides= 2,
+		name= 'max_pooling1')
 	
-	with tf.name_scope('layer2'):
-		conv2 = tf.layers.conv2d(inputs= pool1,
+	conv2 = tf.layers.conv2d(inputs= pool1,
 		filters= 64,
 		kernel_size= [5, 5],
 		strides= [1, 1],
 		padding= 'same',
 		activation= tf.nn.relu,
 		kernel_initializer= tf.truncated_normal_initializer(stddev= 0.1),
-		bias_initializer= tf.zeros_initializer())
-	#~ W2 = tf.Variable(tf.truncated_normal([5, 5, 32, 64], stddev= 0.1))
-	#~ b2 = tf.Variable(tf.constant(0.1, shape= [64]))
-	#~ conv2 = tf.nn.relu(conv2d(pool1, W2) + b2)
+		bias_initializer= tf.zeros_initializer(),
+		name= 'conv_layer2')
 	
-	with tf.name_scope('max_pooling2'):
-		pool2 = tf.layers.max_pooling2d(inputs= conv2,
+	pool2 = tf.layers.max_pooling2d(inputs= conv2,
 		pool_size= [2, 2],
 		padding= 'same',
-		strides= 2)		
+		strides= 2,
+		name= 'max_pooling2')
 		
-	#~ pool2 = max_pool_2x2(conv2)		
 	pool2_flat = tf.reshape(pool2, [-1, 7*7*64])
 		
-	with tf.name_scope('fully_connected_layer1'):
-		fc1 = tf.layers.dense(inputs= pool2_flat,
+	
+	fc1 = tf.layers.dense(inputs= pool2_flat,
 		units= 1024,
 		activation= tf.nn.relu,
 		kernel_initializer= tf.truncated_normal_initializer(stddev= 0.1),
-		bias_initializer= tf.zeros_initializer())
-	#~ W_fc1 = tf.Variable(tf.truncated_normal([7 * 7 * 64, 1024], stddev= 0.1))
-	#~ b_fc1 = tf.Variable(tf.constant(0.1, shape= [1024]))
-	#~ fc1 = tf.nn.relu(tf.matmul(pool2_flat, W_fc1) + b_fc1)
+		bias_initializer= tf.zeros_initializer(),
+		name= 'fully_connected_layer1')
 		
-	with tf.name_scope('fully_connected_layer2'):
-		fc2 = tf.layers.dense(inputs= fc1,
+	fc2 = tf.layers.dense(inputs= fc1,
 		units= 10,
 		activation= None,
 		kernel_initializer= tf.truncated_normal_initializer(stddev= 0.1),
-		bias_initializer= tf.zeros_initializer())
-	#~ W_fc2 = tf.Variable(tf.truncated_normal([1024, 10], stddev= 0.1))
-	#~ b_fc2 = tf.Variable(tf.constant(0.1, shape= [10]))
-	#~ fc2 = tf.matmul(fc1, W_fc2) + b_fc2
+		bias_initializer= tf.zeros_initializer(),
+		name= 'fully_connected_layer2')
 		
 	out = fc2
 	return out		
@@ -97,20 +78,21 @@ def main():
 	test_set = data.test
 	
 	learning_rate = 0.001
-	batch_size = 64
+	batch_size = 128
 	
 	with tf.name_scope('input'):
-		X = tf.placeholder(tf.float32, [None, 784])
-		label = tf.placeholder(tf.float32, [None, 10])
+		X = tf.placeholder(tf.float32, [None, 784], name= 'in_image')
+		label = tf.placeholder(tf.float32, [None, 10], name= 'in_label')
+	
+	with tf.variable_scope('inference'):
+		Y_logit = model(X)	
+		Y = tf.nn.softmax(Y_logit, name= 'predict')
 		
-		
-	Y_logit = model(X)	
-	Y = tf.nn.softmax(Y_logit)
+	tf.add_to_collection('logit_predict', Y_logit)
 	
 	with tf.name_scope('loss'):
-		#~ cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits= Y_logit, labels=label)
-		#~ loss = tf.reduce_mean(cross_entropy)
-		loss = tf.reduce_mean(-tf.reduce_sum(label * tf.log(Y), reduction_indices=[1]))
+		cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits= Y_logit, labels=label)
+		loss = tf.reduce_mean(cross_entropy)
 	with tf.name_scope('evaluation'):
 		correct = tf.equal(tf.argmax(Y,1), tf.argmax(label,1))
 		accuracy = tf.reduce_mean(tf.cast(correct, tf.float32)) 
@@ -120,11 +102,12 @@ def main():
 	
 	merged = tf.summary.merge_all()
 	init_op = tf.global_variables_initializer()
+	saver = tf.train.Saver()
 	
 	with tf.Session() as sess:
 		writer = tf.summary.FileWriter('output', sess.graph)
 		sess.run(init_op)
-		for i in range(500):
+		for i in range(1000):
 			batch_X, batch_Y = train_set.next_batch(batch_size)
 			train_data = {X: batch_X, label: batch_Y }
 			summary,_ = sess.run([merged, optimizer], feed_dict = train_data)
@@ -136,7 +119,14 @@ def main():
 		a, c = sess.run([accuracy, loss], feed_dict = test_data)
 		print('Test accuracy= {}'.format(a))
 		writer.close()
+		saver.save(sess,'model')
+		
+		image = cv2.imread('test.png', cv2.IMREAD_GRAYSCALE)
+		image_flat = np.reshape(image, (-1,784))
+		feed_dict = {X: image_flat}
+		scores = sess.run(Y, feed_dict)
+		print(np.argmax(scores,1))
 	return
-	
+		
 if __name__ == '__main__':
 	main()

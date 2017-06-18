@@ -1,22 +1,47 @@
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import cv2
 import copy
 import numpy as np
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
+import tensorflow as tf
 
-def sum_sort(pt1, pt2):
-	d1 = pt1[0] + pt1[1]
-	d2 = pt2[0] + pt2[1]
-	if d1 > d2:
-		return 1
-	elif d2 > d1:
-		return -1
-	else:
-		return 0
+tf.logging.set_verbosity(tf.logging.INFO)
+
+def predict(image):
+	Y = tf.placeholder(tf.float32, [None,10])
+	Y_ = tf.nn.softmax(Y)
+	with tf.Session() as sess:
+		model = tf.train.import_meta_graph('training/model.meta')
+		model.restore(sess, tf.train.latest_checkpoint('training/./'))
+		graph = tf.get_default_graph()
+		logit_predict = tf.get_collection('logit_predict')
+		X = graph.get_tensor_by_name('input/in_image:0')
+		image_flat = np.reshape(image, (-1,784))
+		feed_dict = {X: image_flat}
+		scores = sess.run(logit_predict, feed_dict)
+		result = sess.run(Y_, feed_dict= {Y: scores[0]})
+		number = np.argmax(result, axis= 1)
+	return number
+
+def clean_image(cell):
+	_, contours, hierarchy = cv2.findContours(cell.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+	if len(contours) == 0:
+		return None
+	largest_contour = max(contours, key= cv2.contourArea)
+	if ( cv2.contourArea(largest_contour) < 10 ):
+		return None
+	
+	return cv2.resize(cell, (28, 28))
 
 def l2_dist(pt1, pt2):
 	return np.sqrt(((pt1[0] - pt2[0]) ** 2) + ((pt1[1] - pt2[1]) ** 2))
 
 def main():		
-	sudoku_im = cv2.imread('sudoku-original.jpg', cv2.IMREAD_GRAYSCALE)
+	sudoku_im = cv2.imread('sudoku-0.jpg', cv2.IMREAD_GRAYSCALE)
 	rows, cols = sudoku_im.shape
 	transformed_sudoku_im = cv2.GaussianBlur(sudoku_im, (5, 5), 0)
 	transformed_sudoku_im = cv2.adaptiveThreshold(transformed_sudoku_im, 255,
@@ -42,8 +67,8 @@ def main():
 	tl_positions = positions
 	tr_positions = [[width_adj(pos), pos[1]] for pos in tl_positions]
 	
-	tl_positions.sort(sum_sort)
-	tr_positions.sort(sum_sort)
+	tr_positions.sort(key= lambda pt: pt[0]+pt[1])
+	tl_positions.sort(key= lambda pt: pt[0]+pt[1])
 	
 	tr = [width_adj(tr_positions[0]), tr_positions[0][1]]
 	bl = [width_adj(tr_positions[-1]), tr_positions[-1][1]]
@@ -64,35 +89,52 @@ def main():
 	sudoku_ext_im = cv2.warpPerspective(sudoku_im, transform_mat, (max_height,max_width))
 	sudoku_bin_im = cv2.adaptiveThreshold(sudoku_ext_im, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 15, 2)
 	
-	kernel = cv2.getStructuringElement(cv2.MORPH_CROSS,(max_width/9,1))
+	kernel = cv2.getStructuringElement(cv2.MORPH_CROSS,(int(max_width/9),1))
 	horizontal = cv2.erode(sudoku_bin_im,kernel,iterations = 1)
 	horizontal = cv2.dilate(horizontal,kernel,iterations = 2)
 	
-	kernel = cv2.getStructuringElement(cv2.MORPH_CROSS,(1,max_height/9))
+	kernel = cv2.getStructuringElement(cv2.MORPH_CROSS,(1,int(max_height/9)))
 	vertical = cv2.erode(sudoku_bin_im,kernel,iterations = 1)
 	vertical = cv2.dilate(vertical,kernel,iterations = 2)
 	
 	intersection_lines = cv2.bitwise_or(vertical, horizontal)
-	numbers = sudoku_bin_im - intersection_lines
-	numbers = cv2.medianBlur(numbers,5)
+	numbers_im = sudoku_bin_im - intersection_lines
+	numbers_im = cv2.medianBlur(numbers_im,3)
 	
-	cell_height = max_height/9
-	cell_width = max_width/9
+	cell_height = int(max_height/9)
+	cell_width = int(max_width/9)
 	
-	for i in range(9):
+	numbers = []
+	cell_resize = []
+	
+	for i in range(1):
 		#~ print(i*cell_height)
-		for j in range(9):
-			cell = sudoku_ext_im[i*cell_width:(i+1)*cell_width, j*cell_height:(j+1)*cell_height]
-			cv2.rectangle(numbers, (j*cell_height,i*cell_width), ((j+1)*cell_height,(i+1)*cell_width), 255, 2)
-			#~ cv2.imshow('asdf', cell)
+		for j in range(9): 
+			cell = numbers_im[i*cell_width:(i+1)*cell_width, j*cell_height:(j+1)*cell_height]
+			cell = clean_image(cell)
+			if cell != None:
+				#~ cv2.imshow('Number', cell)
+				#~ if cv2.waitKey(0) & 0xFF == ord('s'):
+					#~ cv2.imwrite('t.png', cell)
+				cell_resize.append(cell)
+			#~ cv2.rectangle(numbers_im, (j*cell_height,i*cell_width), ((j+1)*cell_height,(i+1)*cell_width), 255, 2)
+			#~ cv2.imshow('Number', cell_resize)
+			#~ numbers.append(predict(cell_resize))
 			#~ cv2.waitKey(0)
-			
+	print(len(cell_resize))
+	numbers = predict(cell_resize)
+	print(numbers)
 	#~ cv2.polylines(sudoku_im,[pts],True,255)
-	cv2.imshow('sudoku', numbers )
-	#~ cv2.imshow('sudoku1', numbers )
+	cv2.imshow('sudoku', numbers_im )
+	#~ cv2.imshow('sudoku1', numbers_im )
 	cv2.waitKey(0)
 	cv2.destroyAllWindows()
 	return
 
+def test():
+	image = cv2.imread('t.png', cv2.IMREAD_GRAYSCALE)
+	print(predict(image))
+
 if __name__ == '__main__':
 	main()
+	#~ test()
