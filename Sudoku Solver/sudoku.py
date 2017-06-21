@@ -28,14 +28,22 @@ def predict(image):
 	return number
 
 def clean_image(cell):
+	#~ mask_im = np.zeros(cell.shape, dtype = 'uint8')
+	out_im = np.zeros((28,28), dtype = 'uint8')
 	_, contours, hierarchy = cv2.findContours(cell.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 	if len(contours) == 0:
 		return None
 	largest_contour = max(contours, key= cv2.contourArea)
-	if ( cv2.contourArea(largest_contour) < 10 ):
+	row, col = cell.shape
+	if ( cv2.contourArea(largest_contour) < .04 *row * col ):
 		return None
-	
-	return cv2.resize(cell, (28, 28))
+	x,y,w,h = cv2.boundingRect(largest_contour)
+	mask_im = cell[y:y+h,x:x+w]
+	if h > 28 or w > 28:
+		return cv2.resize(mask_im, (28, 28))
+	else:
+		out_im[14-h//2:14-h//2+h, 14-w//2:14-w//2+w] = mask_im
+		return out_im
 
 def l2_dist(pt1, pt2):
 	return np.sqrt(((pt1[0] - pt2[0]) ** 2) + ((pt1[1] - pt2[1]) ** 2))
