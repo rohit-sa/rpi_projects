@@ -47,10 +47,10 @@ def md5(M):
 	AA, BB, CC, DD = A, B, C, D
 	X = []
 	for i in range(0,64,4):
-		X.append( M[i:i+3])
+		X.append( M[i:i+4])
 	#Round 1
 	#
-	print(len(X))
+	print(X[0])
 	
 def main():
 	x = read_file('in.txt')
