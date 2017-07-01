@@ -17,7 +17,7 @@ def append_pad(message):
 	len_pad = '%0.16x' % length
 	for i in range(0,len(len_pad),2):
 		message.append(int(len_pad[i:i+1], 16))
-	print(len(message))
+	
 	return message
 
 def F(x, y, z):
@@ -32,25 +32,30 @@ def H(x, y, z):
 def I(x, y, z):
 	return (y ^ (x | ~z))
 
-def k_table():
-	K = np.zeros((64,1))
+def t_table():
+	T = np.zeros((64,1))
 	for i in range(63):
-		K[i] = math.floor(4294967296 * abs(math.sin(i+1)))
-	return K
+		T[i] = math.floor(4294967296 * abs(math.sin(i+1)))
+	return T
+
+def rol(x, shift):
+	x &= 0xFFFFFFFF
+	return ((x >> (32-shift)) | (x << shift)) & 0xFFFFFFFF
 
 def md5(M):
 	A = 0x67452301
 	B = 0xefcdab89
 	C = 0x98badcfe
 	D = 0x10325476
-	K = k_table()
+	T = t_table()
 	AA, BB, CC, DD = A, B, C, D
 	X = []
 	for i in range(0,64,4):
 		X.append( M[i:i+4])
+		
 	#Round 1
 	#
-	print(X[0])
+	print(X)
 	
 def main():
 	x = read_file('in.txt')
@@ -59,4 +64,4 @@ def main():
 	return 0
 	
 if __name__ == '__main__':
-	main()
+	#~ main()
