@@ -12,20 +12,20 @@ import tensorflow as tf
 tf.logging.set_verbosity(tf.logging.INFO)
 
 def predict(image):
-	Y = tf.placeholder(tf.float32, [None,10])
-	Y_ = tf.nn.softmax(Y)
+	y_logit = tf.placeholder(tf.float32, [None,11])
+	y_pred = tf.nn.softmax(y_logit)
 	with tf.Session() as sess:
 		model = tf.train.import_meta_graph('training/model.meta')
 		model.restore(sess, tf.train.latest_checkpoint('training/./'))
 		graph = tf.get_default_graph()
-		logit_predict = tf.get_collection('logit_predict')
-		X = graph.get_tensor_by_name('input/in_image:0')
-		image_flat = np.reshape(image, (-1,784))
-		feed_dict = {X: image_flat}
-		scores = sess.run(logit_predict, feed_dict)
-		result = sess.run(Y_, feed_dict= {Y: scores[0]})
-		number = np.argmax(result, axis= 1)
-	return number
+		logit_pred = tf.get_collection('logit_predict')
+		X = graph.get_tensor_by_name('input/image:0')
+		image = np.reshape(image, (-1,28,28,1))
+		feed_dict = {X: image}
+		scores = sess.run(logit_pred, feed_dict)
+		result = sess.run(y_pred, feed_dict= {y_logit: scores[0]})
+		number_pred = np.argmax(result, axis= 1)
+	return number_pred
 
 def clean_image(cell):
 	#~ mask_im = np.zeros(cell.shape, dtype = 'uint8')
@@ -48,10 +48,9 @@ def clean_image(cell):
 def l2_dist(pt1, pt2):
 	return np.sqrt(((pt1[0] - pt2[0]) ** 2) + ((pt1[1] - pt2[1]) ** 2))
 
-def main():		
-	sudoku_im = cv2.imread('sudoku-0.jpg', cv2.IMREAD_GRAYSCALE)
-	rows, cols = sudoku_im.shape
-	transformed_sudoku_im = cv2.GaussianBlur(sudoku_im, (5, 5), 0)
+def pipeline(in_image):
+	rows, cols = in_image.shape
+	transformed_sudoku_im = cv2.GaussianBlur(in_image, (5, 5), 0)
 	transformed_sudoku_im = cv2.adaptiveThreshold(transformed_sudoku_im, 255,
 												  cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
 												  cv2.THRESH_BINARY_INV, 15, 2)
@@ -94,7 +93,7 @@ def main():
 	dst = np.array([[0, 0],[max_height - 1, 0],[max_height - 1, max_width - 1], [0, max_width - 1]], dtype = "float32")
 	
 	transform_mat = cv2.getPerspectiveTransform(rect, dst)
-	sudoku_ext_im = cv2.warpPerspective(sudoku_im, transform_mat, (max_height,max_width))
+	sudoku_ext_im = cv2.warpPerspective(in_image, transform_mat, (max_height,max_width))
 	sudoku_bin_im = cv2.adaptiveThreshold(sudoku_ext_im, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 15, 2)
 	
 	kernel = cv2.getStructuringElement(cv2.MORPH_CROSS,(int(max_width/9),1))
@@ -112,16 +111,26 @@ def main():
 	cell_height = int(max_height/9)
 	cell_width = int(max_width/9)
 	
+	return numbers_im,cell_height,cell_width
+
+def main():		
+	sudoku_im = cv2.imread('sudoku-0.jpg', cv2.IMREAD_GRAYSCALE)
+	rows, cols = sudoku_im.shape
+	
+	numbers_im,cell_height,cell_width = pipeline(sudoku_im)
+	
+	
 	numbers = []
 	cell_resize = []
 	
-	for i in range(1):
+	for i in range(9):
 		#~ print(i*cell_height)
-		for j in range(9): 
+		for j in range(1): 
 			cell = numbers_im[i*cell_width:(i+1)*cell_width, j*cell_height:(j+1)*cell_height]
 			cell = clean_image(cell)
 			if cell != None:
-				#~ cv2.imshow('Number', cell)
+				cv2.imshow('Number', cell)
+				cv2.waitKey(0)
 				#~ if cv2.waitKey(0) & 0xFF == ord('s'):
 					#~ cv2.imwrite('t.png', cell)
 				cell_resize.append(cell)
@@ -141,8 +150,9 @@ def main():
 
 def test():
 	image = cv2.imread('t.png', cv2.IMREAD_GRAYSCALE)
+	image = np.reshape(image, (-1,28,28,1))
 	print(predict(image))
 
 if __name__ == '__main__':
-	main()
-	#~ test()
+	#~ main()
+	test()
