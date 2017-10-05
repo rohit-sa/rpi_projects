@@ -50,22 +50,24 @@ def l2_dist(pt1, pt2):
 
 def pipeline(in_image):
 	rows, cols = in_image.shape
-	transformed_sudoku_im = cv2.GaussianBlur(in_image, (5, 5), 0)
-	transformed_sudoku_im = cv2.adaptiveThreshold(transformed_sudoku_im, 255,
-												  cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-												  cv2.THRESH_BINARY_INV, 15, 2)
+	filtered_im = cv2.GaussianBlur(in_image, (5, 5), 0)
+	binarized_im = cv2.adaptiveThreshold(filtered_im,255,
+	cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY_INV,11,3)
+								
 	connectivity = 4
-	output = cv2.connectedComponentsWithStats(transformed_sudoku_im,
+	cc_info = cv2.connectedComponentsWithStats(binarized_im,
 											connectivity, cv2.CV_32S)
-	labels_im = output[1]
-	stats = output[2]
+	labels_im = cc_info[1]
+	stats = cc_info[2]
 	stats_area = stats[:, cv2.CC_STAT_AREA]
+	# Label of largest area excluding the background
 	largest_label = np.argmax(stats_area[1:])+1
-	b_box_x, b_box_y, b_box_w, b_box_h = stats[largest_label, :4]
-	transformed_sudoku_im[labels_im == largest_label] = 255
-	transformed_sudoku_im[labels_im != largest_label] = 0
+	# Extract connected component with largest area
+	binarized_im[labels_im == largest_label] = 255
+	binarized_im[labels_im != largest_label] = 0
 	
-	positions = np.where(transformed_sudoku_im == 255)
+	
+	positions = np.where(binarized_im == 255)
 	positions = np.asarray(positions).T
 	positions[:,0], positions[:,1] = positions[:,1], positions[:,0].copy()
 	positions = positions.tolist()
@@ -94,7 +96,11 @@ def pipeline(in_image):
 	
 	transform_mat = cv2.getPerspectiveTransform(rect, dst)
 	sudoku_ext_im = cv2.warpPerspective(in_image, transform_mat, (max_height,max_width))
-	sudoku_bin_im = cv2.adaptiveThreshold(sudoku_ext_im, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 15, 2)
+	sudoku_bin_im = cv2.adaptiveThreshold(sudoku_ext_im, 255,
+	cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY_INV,11,3)
+	
+	cv2.imshow('sudoku', sudoku_bin_im )
+	cv2.waitKey(0)
 	
 	kernel = cv2.getStructuringElement(cv2.MORPH_CROSS,(int(max_width/9),1))
 	horizontal = cv2.erode(sudoku_bin_im,kernel,iterations = 1)
@@ -118,33 +124,11 @@ def main():
 	rows, cols = sudoku_im.shape
 	
 	numbers_im,cell_height,cell_width = pipeline(sudoku_im)
-	
-	
+		
 	numbers = []
 	cell_resize = []
 	
-	for i in range(9):
-		#~ print(i*cell_height)
-		for j in range(1): 
-			cell = numbers_im[i*cell_width:(i+1)*cell_width, j*cell_height:(j+1)*cell_height]
-			cell = clean_image(cell)
-			if cell != None:
-				cv2.imshow('Number', cell)
-				cv2.waitKey(0)
-				#~ if cv2.waitKey(0) & 0xFF == ord('s'):
-					#~ cv2.imwrite('t.png', cell)
-				cell_resize.append(cell)
-			#~ cv2.rectangle(numbers_im, (j*cell_height,i*cell_width), ((j+1)*cell_height,(i+1)*cell_width), 255, 2)
-			#~ cv2.imshow('Number', cell_resize)
-			#~ numbers.append(predict(cell_resize))
-			#~ cv2.waitKey(0)
-	print(len(cell_resize))
-	numbers = predict(cell_resize)
-	print(numbers)
-	#~ cv2.polylines(sudoku_im,[pts],True,255)
-	cv2.imshow('sudoku', numbers_im )
-	#~ cv2.imshow('sudoku1', numbers_im )
-	cv2.waitKey(0)
+	
 	cv2.destroyAllWindows()
 	return
 
@@ -154,5 +138,5 @@ def test():
 	print(predict(image))
 
 if __name__ == '__main__':
-	#~ main()
-	test()
+	main()
+	#~ test()

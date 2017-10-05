@@ -201,7 +201,7 @@ def model(X):
 def main():
 		
 	learning_rate = 0.001
-	batch_size = 110
+	batch_size = 256
 	epochs = 500
 	
 	train_images, train_labels, test_images, test_labels =  get_dataset()
@@ -246,7 +246,7 @@ def main():
 			a = sess.run([accuracy], feed_dict = train_data)
 			if (i+1)%(epochs//10) == 0:
 				print('Train accuracy= {}'.format(a))
-		test_X, test_y = test_pipe.get_dataset(2500)
+		test_X, test_y = test_pipe.get_dataset(5000)
 		test_data = {X: test_X, y_true: test_y}
 		a, c = sess.run([accuracy, loss], feed_dict = test_data)
 		print('Test accuracy= {}'.format(a))
