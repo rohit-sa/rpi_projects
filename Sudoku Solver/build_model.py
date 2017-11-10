@@ -123,8 +123,8 @@ class Pipeline(object):
 		self.__label = one_hot_label
 	
 	def get_batches(self):
-		if self.__curr_iter >= self.__num_images:
-			self.__data,self.__label = self.__shuffle(data,self.__num_images)
+		if self.__curr_iter+self.__batch_size >= self.__num_images:
+			self.__data,self.__label = self.__shuffle(self.__data,self.__label,self.__num_images)
 			self.__curr_iter = 0
 		indicies = list(range(self.__curr_iter,self.__curr_iter+self.__batch_size))
 		self.__curr_iter += self.__batch_size
@@ -205,7 +205,7 @@ def main():
 	epochs = 500
 	
 	train_images, train_labels, test_images, test_labels =  get_dataset()
-	train_pipe = Pipeline(train_images,train_labels,110)
+	train_pipe = Pipeline(train_images,train_labels,batch_size)
 	test_pipe = Pipeline(test_images,test_labels)
 	
 	
